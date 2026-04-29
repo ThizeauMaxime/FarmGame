@@ -4,32 +4,33 @@ using System.Runtime.CompilerServices;
 
 class Program
 {
+    static Ui UI = new Ui();
     static bool isRunning = true;
     static List<Plant> plants = new List<Plant>();
     static int money = 5;
     static List<Item> inventory = new List<Item>();
-    static Dictionary<string, int> prices = new Dictionary<string, int>();
+    static List<Price> prices = new List<Price>();
     
     static void InitPrices()
     {
         foreach (var plant in plantCatalog)
         {
-            prices[plant.Name] = plant.SellPrice;
+            prices.Add(new Price(plant, plant.SellPrice));
         }
     }
 
     static Quest currentQuest = new Quest(
         "Récolter 5 Blés",
-        "Blé",
-        5,
-        40
+        1, // Blé
+        5, // Quantité à obtenir
+        40 // 40€ de récompense
     );
 
     static List<PlantData> plantCatalog = new List<PlantData>()
     {
-        new PlantData("Blé", 10, 3),
-        new PlantData("Carotte", 5, 2),
-        new PlantData("Maïs", 15, 8)
+        new PlantData(1, "Blé", 10, 3),
+        new PlantData(2, "Carotte", 5, 2),
+        new PlantData(3, "Maïs", 15, 8)
     };
 
     
@@ -42,39 +43,20 @@ class Program
             UpdatePlants();
             CheckQuest();
 
-            ShowMenu();
+            UI.ShowMainMenu(money, currentQuest, GetItem);
             HandleInput();
         }
     }
 
-    static void ShowMenu()
+    static string GetUserInput()
     {
-        // Console.Clear();
-        Console.WriteLine("\n=== FARM GAME ===");
-        Console.WriteLine($"💰 Argent : {money}");
-        // Console.WriteLine($"🌾 Graines : {seeds}");
-        Console.WriteLine("\n📜 Quête actuelle :");
-        if (!currentQuest.IsCompleted)
-        {
-            int currentAmount = GetItem(currentQuest.TargetItem)?.Quantity ?? 0;
-
-            Console.WriteLine($"{currentQuest.Description} ({currentAmount}/{currentQuest.TargetAmount})");
-        }
-        else
-        {
-            Console.WriteLine("✅ Quête terminée !");
-        }
-        Console.WriteLine("1 - Planter une graine");
-        Console.WriteLine("2 - Voir inventaire");
-        Console.WriteLine("3 - Récolter");
-        Console.WriteLine("4 - Shop");
-        Console.WriteLine("5 - Quitter");
-        Console.Write("Choix : ");
+        Console.Write("> ");
+        return Console.ReadLine();
     }
 
     static void HandleInput()
     {
-        string input = Console.ReadLine();
+        string input = GetUserInput();
 
         switch (input)
         {
@@ -83,7 +65,7 @@ class Program
                 break;
             
             case "2":
-                ShowInventory();
+                UI.ShowInventory(inventory);
                 break;
             
             case "3":
@@ -99,23 +81,16 @@ class Program
                 break;
 
             default:
-                Console.WriteLine("Choix Invalide !");
+                UI.DefaultConsoleOutput("Choix Invalide !");
                 break;
         }
     }
 
     static void PlantCrop()
     {
-        Console.WriteLine("\n🌱 Que veux-tu planter ?");
+        UI.PlantMenu(plantCatalog);
 
-        for (int i = 0; i < plantCatalog.Count; i++)
-        {
-            var p = plantCatalog[i];
-            Console.WriteLine($"{i + 1} - {p.Name} (⏳ {p.GrowTime}s | 💰 {p.SellPrice}€)");
-        }
-
-        Console.Write("Choix : ");
-        string input = Console.ReadLine();
+        string input = GetUserInput();
 
         if (int.TryParse(input, out int index))
         {
@@ -125,64 +100,30 @@ class Program
             {
                 var selectedPlant = plantCatalog[index];
 
-                if (!RemoveItem("Graine", 1))
+                if (!RemoveItem(1, 1))
                 {
-                    Console.WriteLine("❌ Pas de graines !");
+                    UI.DefaultConsoleOutput("❌ Pas de graines !");
                     return;
                 }
 
                 plants.Add(new Plant(selectedPlant));
 
-                Console.WriteLine($"🌱 Tu plantes {selectedPlant.Name} !");
+                UI.DefaultConsoleOutput($"🌱 Tu plantes {selectedPlant.Name} !");
             }
-        }
-    }
-
-    static void ShowInventory()
-    {
-        // Console.Clear();
-        Console.WriteLine("\n📦 INVENTAIRE :");
-
-        if (inventory.Count == 0)
-        {
-            Console.WriteLine("Vide...");
-        }
-
-        foreach (var item in inventory)
-        {
-            Console.WriteLine($"- {item.Name} x{item.Quantity}");
-        }
-    }
-
-    static void ShowField()
-    {
-        if (plants.Count == 0)
-        {
-            Console.WriteLine("Vide...");
-            return;
-        }
-
-        for (int i = 0; i < plants.Count; i++)
-        {
-            var plant = plants[i];
-
-            string status = plant.IsReady ? "🌾 Prêt" : "🌱 En croissance";
-            Console.WriteLine($"{i + 1}. {plant.Data.Name} - {status}");
         }
     }
 
     static void HarvestPlant()
     {
-        Console.WriteLine("\n🌾 Quelle plante veux-tu récolter ?");
-        ShowField();
-
         if (plants.Count == 0)
         {
+            UI.DefaultConsoleOutput("❌ Pas de plantes à récolter !");
             return;
         }
 
-        Console.Write("Numéro : ");
-        string input = Console.ReadLine();
+        UI.HarvestMenu(plants);
+
+        string input = GetUserInput();
 
         if (int.TryParse(input, out int index))
         {
@@ -194,38 +135,33 @@ class Program
 
                 if (plant.IsReady)
                 {
-                    Console.WriteLine($"✅ Tu récoltes {plant.Data.Name} !");
+                    UI.DefaultConsoleOutput($"✅ Tu récoltes {plant.Data.Name} !");
 
-                    AddItem(plant.Data.Name, 1);
+                    AddItem(plant.Data.Id, plant.Data.Name, 1);
 
                     plants.RemoveAt(index);
                 }
                 else
                 {
-                    Console.WriteLine("⏳ Cette plante n'est pas prête !");
+                    UI.DefaultConsoleOutput("⏳ Cette plante n'est pas prête !");
                 }
             }
             else
             {
-                Console.WriteLine("❌ Index invalide");
+                UI.DefaultConsoleOutput("❌ Index invalide");
             }
         }
         else
         {
-            Console.WriteLine("❌ Entrée invalide");
+            UI.DefaultConsoleOutput("❌ Entrée invalide");
         }
     }
 
     static void OpenShop()
     {
-        Console.Clear();
-        Console.WriteLine("\n🛒 SHOP");
-        Console.WriteLine("1 - Acheter graine (2€)");
-        Console.WriteLine("2 - Vendre des objets");
-        Console.WriteLine("3 - Retour");
-        Console.Write("Choix : ");
+        UI.ShopMenu();
 
-        string input = Console.ReadLine();
+        string input = GetUserInput();
 
         switch (input)
         {
@@ -241,7 +177,7 @@ class Program
                 return;
             
             default:
-                Console.WriteLine("❌ Entrée invalide");
+                UI.DefaultConsoleOutput("❌ Entrée invalide");
                 break;
         }
     }
@@ -253,77 +189,79 @@ class Program
         if (money >= price)
         {
             money -= price;
-            AddItem("Graine", 1);
+            AddItem(1, "Graine", 1);
 
-            Console.WriteLine("✅ Tu as acheté une graine !");
+            UI.DefaultConsoleOutput("✅ Tu as acheté une graine !");
         }
         else
         {
-            Console.WriteLine("❌ Pas assez d'argent !");
+            UI.DefaultConsoleOutput("❌ Pas assez d'argent !");
         }
     }
 
     static void SellItem()
     {
-        Console.WriteLine("\n🛒 SHOP PRICES");
-
-        foreach (var kvp in prices)
-        {
-            Console.WriteLine($"{kvp.Key} : {kvp.Value}€");
-        }
-
-        Console.WriteLine("\n💰 Que veux-tu vendre ?");
-        ShowInventory();
+        UI.ShowShopPrices(prices);
+        UI.ShowInventory(inventory);
 
         if (inventory.Count == 0)
         {
             return;
         }
 
-        Console.Write("Nom de l'objet : ");
-        string name = Console.ReadLine();
+        UI.DefaultConsoleOutput("");
 
-        Item item = GetItem(name);
+        string inputId = GetUserInput();
+
+        if (!int.TryParse(inputId, out int id))
+        {
+            UI.DefaultConsoleOutput("❌ ID invalide");
+            return;
+        }
+
+        Item item = GetItem(id);
 
         if (item == null)
         {
-            Console.WriteLine("❌ Objet introuvable");
+            UI.DefaultConsoleOutput("❌ Objet introuvable");
             return;
         }
 
-        if (!prices.ContainsKey(name))
+        Price price = prices.Find(p => p.ItemId == item.Id);
+
+        if (price == null)
         {
-            Console.WriteLine("❌ Cet objet ne peut pas être vendu");
+            UI.DefaultConsoleOutput("❌ Cet objet ne peut pas être vendu");
             return;
         }
 
-        Console.Write("Quantité : ");
-        string inputQty = Console.ReadLine();
+        Console.WriteLine("Quantité : ");
+        string inputQty = GetUserInput();
 
         if (int.TryParse(inputQty, out int qty))
         {
             if (qty <= 0 || qty > item.Quantity)
             {
-                Console.WriteLine("❌ Quantité invalide");
+                UI.DefaultConsoleOutput("❌ Quantité invalide");
                 return;
             }
 
-            int total = prices[name] * qty;
+            int total = price.Amount * qty;
 
-            RemoveItem(name, qty);
+            RemoveItem(item.Id, qty);
             money += total;
 
-            Console.WriteLine($"✅ Vendu {qty}x {name} pour {total}€ !");
+            UI.DefaultConsoleOutput($"✅ Vendu {qty}x {item.Name} pour {total}€ !");
         }
         else
         {
-            Console.WriteLine("❌ Entrée invalide");
+            UI.DefaultConsoleOutput("❌ Entrée invalide");
         }
     }
 
     static void QuitGame()
     {
-        Console.WriteLine("Au revoir");
+        UI.DefaultConsoleOutput("Au revoir");
         isRunning = false;
     }
 
@@ -349,23 +287,22 @@ class Program
             currentQuest.IsCompleted = true;
             money += currentQuest.Reward;
 
-            Console.WriteLine($"\n🎉 Quête accomplie !");
-            Console.WriteLine($"💰 Récompense : {currentQuest.Reward}€");
+            UI.DefaultConsoleOutput($"\n🎉 Quête accomplie !\n💰 Récompense : {currentQuest.Reward}€");
         }
     }
 
-    static Item GetItem(string name)
+    static Item GetItem(int id)
     {
-        return inventory.Find(i => i.Name == name);
+        return inventory.Find(i => i.Id == id);
     }
 
-    static void AddItem(string name, int quantity)
+    static void AddItem(int id, string name, int quantity)
     {
-        Item item = GetItem(name);
+        Item item = GetItem(id);
 
         if (item == null)
         {
-            inventory.Add(new Item(name, quantity));
+            inventory.Add(new Item(id, name, quantity));
         }
         else
         {
@@ -373,9 +310,9 @@ class Program
         }
     }
 
-    static bool RemoveItem(string name, int quantity)
+    static bool RemoveItem(int id, int quantity)
     {
-        Item item = GetItem(name);
+        Item item = GetItem(id);
 
         if (item != null && item.Quantity >= quantity)
         {
